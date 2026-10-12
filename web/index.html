@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS CLF-C02 Practice Quiz</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #171a23;
+    --border: #2a2f3d;
+    --text: #e8eaf0;
+    --muted: #9aa1b1;
+    --accent: #ff9900;
+    --correct: #2ea043;
+    --wrong: #da3633;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 1.5rem;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8rem; margin-bottom: 0.75rem; }
+  .domain-tag {
+    background: #2a2f3d;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .question-text { font-size: 1.05rem; margin-bottom: 1rem; line-height: 1.4; }
+  .option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: #1d212c;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  .option:hover:not(:disabled) { border-color: var(--accent); }
+  .option:disabled { cursor: default; }
+  .option.correct { border-color: var(--correct); background: rgba(46,160,67,0.15); }
+  .option.wrong { border-color: var(--wrong); background: rgba(218,54,51,0.15); }
+  .explain {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    display: none;
+  }
+  .explain.show { display: block; }
+  .explain h4 { margin: 0 0 0.25rem; font-size: 0.85rem; color: var(--accent); }
+  .explain p { margin: 0 0 0.75rem; color: var(--muted); }
+  .controls { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+  button.nav {
+    background: var(--accent);
+    color: #1a1a1a;
+    border: none;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.nav:disabled { opacity: 0.4; cursor: default; }
+  .progress { color: var(--muted); font-size: 0.85rem; }
+  select {
+    background: #1d212c;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .score-screen { text-align: center; padding: 2rem 1rem; }
+  .score-screen .big { font-size: 2.5rem; font-weight: 700; color: var(--accent); }
+  .domain-breakdown { text-align: left; margin-top: 1.5rem; }
+  .domain-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AWS Certified Cloud Practitioner — Practice Quiz</h1>
+  <p class="subtitle">
+    28 original practice questions covering all 4 CLF-C02 exam domains. Not real or leaked exam
+    questions — written from scratch to test the same publicly documented concepts.
+  </p>
+
+  <div id="setup">
+    <label for="domainFilter" style="display:block; margin-bottom:0.4rem; color: var(--muted); font-size:0.85rem;">
+      Domain
+    </label>
+    <select id="domainFilter"></select>
+    <br>
+    <button class="nav" id="startBtn">Start quiz</button>
+  </div>
+
+  <div id="quiz" style="display:none;">
+    <div class="progress" id="progress"></div>
+    <div class="card" id="questionCard"></div>
+    <div class="controls">
+      <span></span>
+      <button class="nav" id="nextBtn" disabled>Next</button>
+    </div>
+  </div>
+
+  <div id="results" style="display:none;"></div>
+</div>
+
+<script src="../questions/questions.js"></script>
+<script>
+  let pool = [];
+  let current = 0;
+  let answers = []; // { correct: bool, domain: string }
+
+  const domainFilter = document.getElementById("domainFilter");
+  const DOMAIN_LABELS = {
+    "all": "All domains (28 questions)",
+    "cloud-concepts": "Cloud Concepts",
+    "security-compliance": "Security & Compliance",
+    "technology-services": "Cloud Technology & Services",
+    "billing-pricing": "Billing, Pricing & Support",
+  };
+  for (const [value, label] of Object.entries(DOMAIN_LABELS)) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    domainFilter.appendChild(opt);
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  document.getElementById("startBtn").addEventListener("click", () => {
+    const domain = domainFilter.value;
+    pool = shuffle(domain === "all" ? QUESTIONS : QUESTIONS.filter(q => q.domain === domain));
+    current = 0;
+    answers = [];
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("results").style.display = "none";
+    document.getElementById("quiz").style.display = "block";
+    renderQuestion();
+  });
+
+  document.getElementById("nextBtn").addEventListener("click", () => {
+    current++;
+    if (current >= pool.length) {
+      renderResults();
+    } else {
+      renderQuestion();
+    }
+  });
+
+  function renderQuestion() {
+    const q = pool[current];
+    document.getElementById("progress").textContent = `Question ${current + 1} of ${pool.length}`;
+    document.getElementById("nextBtn").disabled = true;
+    document.getElementById("nextBtn").textContent = current === pool.length - 1 ? "See results" : "Next";
+
+    const card = document.getElementById("questionCard");
+    card.innerHTML = "";
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = `<span class="domain-tag">${DOMAIN_LABELS[q.domain] || q.domain}</span>`;
+    card.appendChild(meta);
+
+    const qText = document.createElement("div");
+    qText.className = "question-text";
+    qText.textContent = q.question;
+    card.appendChild(qText);
+
+    const optionOrder = shuffle(q.options.map((text, idx) => ({ text, idx })));
+
+    const explain = document.createElement("div");
+    explain.className = "explain";
+    explain.innerHTML = `
+      <h4>Explanation</h4>
+      <p>${q.explanation}</p>
+      <h4>Common trap</h4>
+      <p>${q.commonTrap}</p>
+    `;
+
+    optionOrder.forEach(({ text, idx }) => {
+      const btn = document.createElement("button");
+      btn.className = "option";
+      btn.textContent = text;
+      btn.addEventListener("click", () => {
+        const wasCorrect = idx === q.correctIndex;
+        answers.push({ correct: wasCorrect, domain: q.domain });
+
+        [...card.querySelectorAll(".option")].forEach((el, elIdx) => {
+          el.disabled = true;
+          const elOriginalIdx = optionOrder[elIdx].idx;
+          if (elOriginalIdx === q.correctIndex) el.classList.add("correct");
+          else if (el === btn) el.classList.add("wrong");
+        });
+
+        explain.classList.add("show");
+        document.getElementById("nextBtn").disabled = false;
+      });
+      card.appendChild(btn);
+    });
+
+    card.appendChild(explain);
+  }
+
+  function renderResults() {
+    document.getElementById("quiz").style.display = "none";
+    const resultsEl = document.getElementById("results");
+    resultsEl.style.display = "block";
+
+    const correctCount = answers.filter(a => a.correct).length;
+    const pct = Math.round((correctCount / answers.length) * 100);
+
+    const byDomain = {};
+    for (const a of answers) {
+      byDomain[a.domain] = byDomain[a.domain] || { correct: 0, total: 0 };
+      byDomain[a.domain].total++;
+      if (a.correct) byDomain[a.domain].correct++;
+    }
+
+    let breakdownHtml = "";
+    for (const [domain, stats] of Object.entries(byDomain)) {
+      breakdownHtml += `<div class="domain-row"><span>${DOMAIN_LABELS[domain] || domain}</span><span>${stats.correct} / ${stats.total}</span></div>`;
+    }
+
+    resultsEl.innerHTML = `
+      <div class="card score-screen">
+        <div class="big">${correctCount} / ${answers.length}</div>
+        <div style="color: var(--muted); margin-top:0.25rem;">${pct}% correct</div>
+        <div class="domain-breakdown">${breakdownHtml}</div>
+        <button class="nav" id="restartBtn" style="margin-top:1.5rem;">Try again</button>
+      </div>
+    `;
+    document.getElementById("restartBtn").addEventListener("click", () => {
+      resultsEl.style.display = "none";
+      document.getElementById("setup").style.display = "block";
+    });
+  }
+</script>
+</body>
+</html>
